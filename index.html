@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DAYFLOW - Premium Day Planner</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DAYFLOW">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><text x='50' y='35' text-anchor='middle' font-family='Arial' font-size='8' font-weight='900' fill='white'>DAYFLOW</text><text x='50' y='70' text-anchor='middle' font-family='Arial' font-size='6' font-weight='300' fill='white'>EST. 2025</text></svg>">
+    <link rel="manifest" href="data:application/json,{%22name%22:%22DAYFLOW%22,%22short_name%22:%22DAYFLOW%22,%22start_url%22:%22.%22,%22display%22:%22standalone%22,%22background_color%22:%22%23000000%22,%22theme_color%22:%22%23000000%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23000'/><text x='96' y='70' text-anchor='middle' font-family='Arial' font-size='16' font-weight='900' fill='white'>DAYFLOW</text><text x='96' y='130' text-anchor='middle' font-family='Arial' font-size='12' font-weight='300' fill='white'>EST. 2025</text></svg>%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22}]}">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8f8f8;
+            color: #000;
+            line-height: 1.2;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 430px;
+            margin: 0 auto;
+            min-height: 100vh;
+            background: white;
+            position: relative;
+        }
+        
+        .header {
+            background: #000;
+            color: white;
+            padding: 60px 40px 40px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #333;
+        }
+        
+        .brand {
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .tagline {
+            font-size: 11px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            opacity: 0.7;
+            text-transform: uppercase;
+        }
+        
+        .nav-section {
+            background: #000;
+            padding: 0 40px 30px;
+        }
+        
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            border: 1px solid #333;
+        }
+        
+        .day-cell {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 20px 0;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .day-cell:hover {
+            background: #222;
+        }
+        
+        .day-cell.active {
+            background: white;
+            color: #000;
+        }
+        
+        .day-cell::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: transparent;
+            transition: background 0.2s ease;
+        }
+        
+        .day-cell.active::after {
+            background: #000;
+        }
+        
+        .content-area {
+            padding: 40px;
+            min-height: 500px;
+        }
+        
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 30px;
+            color: #666;
+        }
+        
+        .tasks-grid {
+            display: grid;
+            gap: 2px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 40px;
+        }
+        
+        .task-row {
+            display: grid;
+            grid-template-columns: 80px 1fr 60px;
+            background: white;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background 0.2s ease;
+        }
+        
+        .task-row:hover {
+            background: #f8f8f8;
+        }
+        
+        .task-row:last-child {
+            border-bottom: none;
+        }
+        
+        .task-time {
+            padding: 20px 15px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #999;
+            letter-spacing: 1px;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .task-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        
+        .task-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: #000;
+            margin-bottom: 4px;
+        }
+        
+        .task-duration {
+            font-size: 10px;
+            font-weight: 400;
+            color: #999;
+            letter-spacing: 0.5px;
+        }
+        
+        .task-actions {
+            padding: 20px 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-left: 1px solid #e0e0e0;
+        }
+        
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px;
+            transition: color 0.2s ease;
+        }
+        
+        .delete-btn:hover {
+            color: #000;
+        }
+        
+        .add-section {
+            background: #f8f8f8;
+            padding: 40px;
+            margin: 0 -40px;
+        }
+        
+        .form-grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .form-group {
+            display: grid;
+            gap: 8px;
+        }
+        
+        .form-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #666;
+        }
+        
+        .form-input {
+            background: white;
+            border: 1px solid #e0e0e0;
+            padding: 15px;
+            font-size: 14px;
+            font-weight: 400;
+            color: #000;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #000;
+        }
+        
+        .form-input::placeholder {
+            color: #999;
+            font-weight: 300;
+        }
+        
+        .time-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .submit-btn {
+            background: #000;
+            color: white;
+            border: none;
+            padding: 18px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 10px;
+        }
+        
+        .submit-btn:hover {
+            background: #333;
+        }
+        
+        .submit-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: #999;
+        }
+        
+        .empty-icon {
+            font-size: 40px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        .empty-text {
+            font-size: 12px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 4px;
+            height: 4px;
+            background: #00ff00;
+            border-radius: 50%;
+            opacity: 0.8;
+        }
+        
+        .footer {
+            background: #000;
+            color: white;
+            padding: 20px 40px;
+            text-align: center;
+            margin-top: 60px;
+        }
+        
+        .footer-text {
+            font-size: 9px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            opacity: 0.5;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                max-width: 100%;
+            }
+            
+            .header {
+                padding: 50px 30px 30px;
+            }
+            
+            .brand {
+                font-size: 24px;
+                letter-spacing: 6px;
+            }
+            
+            .content-area {
+                padding: 30px;
+            }
+            
+            .add-section {
+                padding: 30px;
+                margin: 0 -30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="brand">DAYFLOW</div>
+            <div class="tagline">EST. 2025</div>
+        </div>
+        
+        <div class="nav-section">
+            <div class="week-grid">
+                <button class="day-cell" data-day="0">SUN</button>
+                <button class="day-cell" data-day="1">MON</button>
+                <button class="day-cell" data-day="2">TUE</button>
+                <button class="day-cell" data-day="3">WED</button>
+                <button class="day-cell" data-day="4">THU</button>
+                <button class="day-cell" data-day="5">FRI</button>
+                <button class="day-cell" data-day="6">SAT</button>
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <div class="section-title" id="sectionTitle">SELECT DAY</div>
+            
+            <div class="tasks-grid" id="tasksContainer">
+                <div class="empty-state">
+                    <div class="empty-icon">—</div>
+                    <div class="empty-text">Choose a day to begin</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="add-section" id="addSection" style="display: none;">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Activity</label>
+                    <input type="text" class="form-input" id="taskTitle" placeholder="Enter your planned activity">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Schedule</label>
+                    <div class="time-grid">
+                        <input type="time" class="form-input" id="startTime" required>
+                        <input type="time" class="form-input" id="endTime" required>
+                    </div>
+                </div>
+                
+                <button class="submit-btn" onclick="addTask()">Add Schedule</button>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-text">PROVIDING PREMIUM PLANNING SERVICES WORLDWIDE</div>
+        </div>
+    </div>
+
+    <script>
+        let currentDay = null;
+        let scheduleData = {};
+        let alarms = new Set();
+        
+        const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadScheduleData();
+            setupDayButtons();
+            setupServiceWorker();
+            requestNotificationPermission();
+        });
+        
+        function setupDayButtons() {
+            document.querySelectorAll('.day-cell').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const day = this.dataset.day;
+                    selectDay(day);
+                });
+            });
+        }
+        
+        function selectDay(day) {
+            currentDay = day;
+            
+            // Update active button
+            document.querySelectorAll('.day-cell').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-day="${day}"]`).classList.add('active');
+            
+            // Update section title
+            document.getElementById('sectionTitle').textContent = dayNames[day];
+            
+            // Show form and tasks
+            document.getElementById('addSection').style.display = 'block';
+            displayTasks();
+        }
+        
+        function addTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (!title || !startTime || !endTime) {
+                alert('Please complete all fields');
+                return;
+            }
+            
+            if (startTime >= endTime) {
+                alert('End time must be after start time');
+                return;
+            }
+            
+            const task = {
+                id: Date.now(),
+                title,
+                startTime,
+                endTime,
+                day: currentDay
+            };
+            
+            if (!scheduleData[currentDay]) {
+                scheduleData[currentDay] = [];
+            }
+            
+            scheduleData[currentDay].push(task);
+            scheduleData[currentDay].sort((a, b) => a.startTime.localeCompare(b.startTime));
+            
+            saveScheduleData();
+            displayTasks();
+            setupAlarms(task);
+            
+            // Clear form
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+        }
+        
+        function displayTasks() {
+            const container = document.getElementById('tasksContainer');
+            const tasks = scheduleData[currentDay] || [];
+            
+            if (tasks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">—</div>
+                        <div class="empty-text">No scheduled activities</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = tasks.map(task => `
+                <div class="task-row">
+                    <div class="task-time">${formatTime(task.startTime)}</div>
+                    <div class="task-content">
+                        <div class="task-title">${task.title}</div>
+                        <div class="task-duration">${formatTime(task.startTime)} - ${formatTime(task.endTime)} · ${calculateDuration(task.startTime, task.endTime)}</div>
+                    </div>
+                    <div class="task-actions">
+                        <button class="delete-btn" onclick="deleteTask(${task.id})">×</button>
+                        <div class="status-indicator"></div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function deleteTask(taskId) {
+            if (!scheduleData[currentDay]) return;
+            
+            scheduleData[currentDay] = scheduleData[currentDay].filter(task => task.id !== taskId);
+            saveScheduleData();
+            displayTasks();
+            
+            // Remove alarms
+            alarms.delete(`start-${taskId}`);
+            alarms.delete(`end-${taskId}`);
+        }
+        
+        function formatTime(time) {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const hour12 = hour % 12 || 12;
+            return `${hour12}:${minutes}${ampm}`;
+        }
+        
+        function calculateDuration(start, end) {
+            const startMinutes = timeToMinutes(start);
+            const endMinutes = timeToMinutes(end);
+            const duration = endMinutes - startMinutes;
+            const hours = Math.floor(duration / 60);
+            const minutes = duration % 60;
+            
+            if (hours > 0) {
+                return `${hours}H ${minutes}M`;
+            }
+            return `${minutes}M`;
+        }
+        
+        function timeToMinutes(time) {
+            const [hours, minutes] = time.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+        
+        function setupAlarms(task) {
+            const now = new Date();
+            const today = now.getDay();
+            
+            if (parseInt(task.day) === today) {
+                const startTime = new Date();
+                const endTime = new Date();
+                
+                const [startHours, startMinutes] = task.startTime.split(':').map(Number);
+                const [endHours, endMinutes] = task.endTime.split(':').map(Number);
+                
+                startTime.setHours(startHours, startMinutes, 0, 0);
+                endTime.setHours(endHours, endMinutes, 0, 0);
+                
+                if (startTime > now) {
+                    setTimeout(() => {
+                        showNotification(`STARTING: ${task.title.toUpperCase()}`, 'Your scheduled activity begins now');
+                        playAlarmSound();
+                    }, startTime - now);
+                }
+                
+                if (endTime > now) {
+                    setTimeout(() => {
+                        showNotification(`ENDING: ${task.title.toUpperCase()}`, 'Your scheduled activity ends now');
+                        playAlarmSound();
+                    }, endTime - now);
+                }
+            }
+        }
+        
+        function showNotification(title, body) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, {
+                    body,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><text x="50" y="35" text-anchor="middle" font-family="Arial" font-size="8" font-weight="900" fill="white">DAYFLOW</text><text x="50" y="70" text-anchor="middle" font-family="Arial" font-size="6" font-weight="300" fill="white">EST. 2025</text></svg>',
+                    tag: 'dayflow-premium'
+                });
+            }
+        }
+        
+        function playAlarmSound() {
+            // Premium notification sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 1000;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.8);
+        }
+        
+        function requestNotificationPermission() {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+        
+        function saveScheduleData() {
+            const data = JSON.stringify(scheduleData);
+            document.cookie = `dayflow_schedule=${data}; expires=Thu, 31 Dec 2099 23:59:59 GMT; path=/`;
+        }
+        
+        function loadScheduleData() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'dayflow_schedule') {
+                    try {
+                        scheduleData = JSON.parse(decodeURIComponent(value));
+                    } catch (e) {
+                        scheduleData = {};
+                    }
+                    break;
+                }
+            }
+        }
+        
+        function setupServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                const swCode = `
+                    self.addEventListener('install', event => {
+                        self.skipWaiting();
+                    });
+                    
+                    self.addEventListener('activate', event => {
+                        event.waitUntil(self.clients.claim());
+                    });
+                    
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(
+                            caches.match(event.request).then(response => {
+                                return response || fetch(event.request);
+                            })
+                        );
+                    });
+                `;
+                
+                const blob = new Blob([swCode], { type: 'application/javascript' });
+                const swUrl = URL.createObjectURL(blob);
+                
+                navigator.serviceWorker.register(swUrl);
+            }
+        }
+    </script>
+</body>
+</html>
