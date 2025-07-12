@@ -328,7 +328,15 @@
             opacity: 0.5;
         }
         
-        @media (max-width: 480px) {
+        .alarm-pulse {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
             .container {
                 max-width: 100%;
             }
@@ -350,7 +358,7 @@
                 padding: 30px;
                 margin: 0 -30px;
             }
-        }
+        
     </style>
 </head>
 <body>
@@ -411,6 +419,7 @@
         let currentDay = null;
         let scheduleData = {};
         let alarms = new Set();
+        let activeAlarms = new Map(); // Track active alarms
         
         const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
         
@@ -420,7 +429,162 @@
             setupDayButtons();
             setupServiceWorker();
             requestNotificationPermission();
+            autoSelectToday();
+            setupAlarmChecker();
         });
+        
+        function autoSelectToday() {
+            const today = new Date().getDay();
+            selectDay(today.toString());
+        }
+        
+        function setupAlarmChecker() {
+            // Check for alarms every minute
+            setInterval(checkAlarms, 60000);
+            // Also check immediately
+            checkAlarms();
+        }
+        
+        function checkAlarms() {
+            const now = new Date();
+            const today = now.getDay();
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const todayTasks = scheduleData[today] || [];
+            
+            todayTasks.forEach(task => {
+                const startAlarmId = `start-${task.id}`;
+                const endAlarmId = `end-${task.id}`;
+                
+                // Check start time
+                if (task.startTime === currentTime && !activeAlarms.has(startAlarmId)) {
+                    triggerPersistentAlarm(startAlarmId, `STARTING: ${task.title.toUpperCase()}`, 'Your scheduled activity begins now');
+                }
+                
+                // Check end time
+                if (task.endTime === currentTime && !activeAlarms.has(endAlarmId)) {
+                    triggerPersistentAlarm(endAlarmId, `ENDING: ${task.title.toUpperCase()}`, 'Your scheduled activity ends now');
+                }
+            });
+        }
+        
+        function triggerPersistentAlarm(alarmId, title, message) {
+            // Create persistent alarm overlay
+            const alarmOverlay = document.createElement('div');
+            alarmOverlay.id = `alarm-${alarmId}`;
+            alarmOverlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.95);
+                color: white;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                font-family: 'Inter', sans-serif;
+                text-align: center;
+                padding: 40px;
+                backdrop-filter: blur(10px);
+            `;
+            
+            alarmOverlay.innerHTML = `
+                <div style="font-size: 48px; margin-bottom: 20px; animation: pulse 1s infinite;">⏰</div>
+                <div style="font-size: 24px; font-weight: 700; letter-spacing: 2px; margin-bottom: 15px;">${title}</div>
+                <div style="font-size: 16px; font-weight: 300; margin-bottom: 40px; opacity: 0.8;">${message}</div>
+                <button onclick="dismissAlarm('${alarmId}')" style="
+                    background: white;
+                    color: black;
+                    border: none;
+                    padding: 15px 30px;
+                    font-size: 14px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                    cursor: pointer;
+                    text-transform: uppercase;
+                ">DISMISS ALARM</button>
+            `;
+            
+            document.body.appendChild(alarmOverlay);
+            
+            // Start persistent sound
+            const audioLoop = createPersistentSound();
+            activeAlarms.set(alarmId, {
+                overlay: alarmOverlay,
+                audioLoop: audioLoop
+            });
+            
+            // Show notification
+            showNotification(title, message);
+            
+            // Vibrate if supported
+            if ('vibrate' in navigator) {
+                navigator.vibrate([500, 200, 500, 200, 500]);
+            }
+        }
+        
+        function createPersistentSound() {
+            let audioContext;
+            let isPlaying = true;
+            
+            function playSound() {
+                if (!isPlaying) return;
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 1000;
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+                
+                // Repeat every 2 seconds
+                setTimeout(() => {
+                    if (isPlaying) {
+                        playSound();
+                    }
+                }, 2000);
+            }
+            
+            playSound();
+            
+            return {
+                stop: () => {
+                    isPlaying = false;
+                    if (audioContext) {
+                        audioContext.close();
+                    }
+                }
+            };
+        }
+        
+        function dismissAlarm(alarmId) {
+            const alarm = activeAlarms.get(alarmId);
+            if (alarm) {
+                // Remove overlay
+                alarm.overlay.remove();
+                
+                // Stop sound
+                alarm.audioLoop.stop();
+                
+                // Remove from active alarms
+                activeAlarms.delete(alarmId);
+            }
+        }
+        
+        // Make dismissAlarm globally accessible
+        window.dismissAlarm = dismissAlarm;
         
         function setupDayButtons() {
             document.querySelectorAll('.day-cell').forEach(btn => {
@@ -430,8 +594,6 @@
                 });
             });
         }
-        
-        function selectDay(day) {
             currentDay = day;
             
             // Update active button
@@ -446,7 +608,7 @@
             // Show form and tasks
             document.getElementById('addSection').style.display = 'block';
             displayTasks();
-        }
+        
         
         function addTask() {
             const title = document.getElementById('taskTitle').value.trim();
@@ -556,33 +718,8 @@
         }
         
         function setupAlarms(task) {
-            const now = new Date();
-            const today = now.getDay();
-            
-            if (parseInt(task.day) === today) {
-                const startTime = new Date();
-                const endTime = new Date();
-                
-                const [startHours, startMinutes] = task.startTime.split(':').map(Number);
-                const [endHours, endMinutes] = task.endTime.split(':').map(Number);
-                
-                startTime.setHours(startHours, startMinutes, 0, 0);
-                endTime.setHours(endHours, endMinutes, 0, 0);
-                
-                if (startTime > now) {
-                    setTimeout(() => {
-                        showNotification(`STARTING: ${task.title.toUpperCase()}`, 'Your scheduled activity begins now');
-                        playAlarmSound();
-                    }, startTime - now);
-                }
-                
-                if (endTime > now) {
-                    setTimeout(() => {
-                        showNotification(`ENDING: ${task.title.toUpperCase()}`, 'Your scheduled activity ends now');
-                        playAlarmSound();
-                    }, endTime - now);
-                }
-            }
+            // Alarms are now handled by the checkAlarms function
+            // This function can be used for scheduling future alarms if needed
         }
         
         function showNotification(title, body) {
