@@ -337,6 +337,8 @@
             50% { transform: scale(1.1); opacity: 0.7; }
             100% { transform: scale(1); opacity: 1; }
         }
+        
+        @media (max-width: 480px) {
             .container {
                 max-width: 100%;
             }
@@ -358,14 +360,14 @@
                 padding: 30px;
                 margin: 0 -30px;
             }
-        
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <div class="brand">DAYFLOW</div>
-            <div class="tagline">EST. 2026</div>
+            <div class="tagline">EST. 2025</div>
         </div>
         
         <div class="nav-section">
@@ -594,6 +596,8 @@
                 });
             });
         }
+        
+        function selectDay(day) {
             currentDay = day;
             
             // Update active button
@@ -608,7 +612,7 @@
             // Show form and tasks
             document.getElementById('addSection').style.display = 'block';
             displayTasks();
-        
+        }
         
         function addTask() {
             const title = document.getElementById('taskTitle').value.trim();
