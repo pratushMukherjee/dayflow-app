@@ -494,8 +494,8 @@
             `;
             
             alarmOverlay.innerHTML = `
-                <div style="font-size: 48px; margin-bottom: 20px; animation: pulse 1s infinite;">⏰</div>
-                <div style="font-size: 24px; font-weight: 700; letter-spacing: 2px; margin-bottom: 15px;">${title}</div>
+                <div style="font-size: 48px; margin-bottom: 20px; animation: pulse 1s infinite;">🚨</div>
+                <div style="font-size: 24px; font-weight: 700; letter-spacing: 2px; margin-bottom: 15px; animation: pulse 1s infinite;">${title}</div>
                 <div style="font-size: 16px; font-weight: 300; margin-bottom: 40px; opacity: 0.8;">${message}</div>
                 <button onclick="dismissAlarm('${alarmId}')" style="
                     background: white;
@@ -507,6 +507,7 @@
                     letter-spacing: 1px;
                     cursor: pointer;
                     text-transform: uppercase;
+                    animation: pulse 1s infinite;
                 ">DISMISS ALARM</button>
             `;
             
@@ -514,56 +515,85 @@
             
             // Start persistent sound
             const audioLoop = createPersistentSound();
+            
+            // Start persistent vibration pattern
+            const vibrationPattern = startPersistentVibration();
+            
             activeAlarms.set(alarmId, {
                 overlay: alarmOverlay,
-                audioLoop: audioLoop
+                audioLoop: audioLoop,
+                vibrationPattern: vibrationPattern
             });
             
-            // Show notification
-            showNotification(title, message);
+            // Show enhanced notification
+            showPersistentNotification(title, message);
             
-            // Vibrate if supported
-            if ('vibrate' in navigator) {
-                navigator.vibrate([500, 200, 500, 200, 500]);
-            }
+            // Try to keep the page active
+            keepPageActive();
+            
+            // Set up background alarm continuation
+            setupBackgroundAlarm(alarmId, title, message);
         }
         
         function createPersistentSound() {
             let audioContext;
             let isPlaying = true;
+            let oscillatorTimeout;
             
-            function playSound() {
+            function playAlarmBeep() {
                 if (!isPlaying) return;
                 
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-                
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                
-                oscillator.frequency.value = 1000;
-                oscillator.type = 'sine';
-                
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-                
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.5);
-                
-                // Repeat every 2 seconds
-                setTimeout(() => {
+                try {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    // Create multiple oscillators for a more intense alarm sound
+                    const oscillator1 = audioContext.createOscillator();
+                    const oscillator2 = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator1.connect(gainNode);
+                    oscillator2.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Alarm frequencies
+                    oscillator1.frequency.value = 1000;
+                    oscillator2.frequency.value = 1200;
+                    oscillator1.type = 'square';
+                    oscillator2.type = 'square';
+                    
+                    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+                    
+                    oscillator1.start(audioContext.currentTime);
+                    oscillator2.start(audioContext.currentTime);
+                    oscillator1.stop(audioContext.currentTime + 0.8);
+                    oscillator2.stop(audioContext.currentTime + 0.8);
+                    
+                    // Repeat every 1 second for more urgency
+                    oscillatorTimeout = setTimeout(() => {
+                        if (isPlaying) {
+                            playAlarmBeep();
+                        }
+                    }, 1000);
+                } catch (e) {
+                    console.log('Audio context error:', e);
+                    // Fallback to system beep
                     if (isPlaying) {
-                        playSound();
+                        oscillatorTimeout = setTimeout(() => {
+                            if (isPlaying) playAlarmBeep();
+                        }, 1000);
                     }
-                }, 2000);
+                }
             }
             
-            playSound();
+            playAlarmBeep();
             
             return {
                 stop: () => {
                     isPlaying = false;
+                    if (oscillatorTimeout) {
+                        clearTimeout(oscillatorTimeout);
+                    }
                     if (audioContext) {
                         audioContext.close();
                     }
@@ -580,8 +610,23 @@
                 // Stop sound
                 alarm.audioLoop.stop();
                 
+                // Stop vibration
+                if (alarm.vibrationPattern) {
+                    alarm.vibrationPattern.stop();
+                }
+                
+                // Stop background alarm
+                if (alarm.backgroundInterval) {
+                    clearInterval(alarm.backgroundInterval);
+                }
+                
                 // Remove from active alarms
                 activeAlarms.delete(alarmId);
+                
+                // Clear any wake locks
+                if (alarm.wakeLock) {
+                    alarm.wakeLock.release();
+                }
             }
         }
         
@@ -726,13 +771,101 @@
             // This function can be used for scheduling future alarms if needed
         }
         
-        function showNotification(title, body) {
+        function showPersistentNotification(title, body) {
             if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification(title, {
+                const notification = new Notification(title, {
                     body,
                     icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23000"/><text x="50" y="35" text-anchor="middle" font-family="Arial" font-size="8" font-weight="900" fill="white">DAYFLOW</text><text x="50" y="70" text-anchor="middle" font-family="Arial" font-size="6" font-weight="300" fill="white">EST. 2025</text></svg>',
-                    tag: 'dayflow-premium'
+                    tag: 'dayflow-alarm',
+                    requireInteraction: true, // Makes notification persistent
+                    vibrate: [500, 200, 500, 200, 500, 200, 500],
+                    actions: [
+                        {
+                            action: 'dismiss',
+                            title: 'Dismiss Alarm'
+                        }
+                    ]
                 });
+                
+                notification.onclick = function() {
+                    window.focus();
+                    notification.close();
+                };
+            }
+        }
+        
+        function startPersistentVibration() {
+            let vibrationInterval;
+            let isVibrating = true;
+            
+            function vibratePattern() {
+                if (!isVibrating) return;
+                
+                if ('vibrate' in navigator) {
+                    // Strong vibration pattern for alarm
+                    navigator.vibrate([800, 200, 800, 200, 800, 200, 800]);
+                    
+                    vibrationInterval = setTimeout(() => {
+                        if (isVibrating) {
+                            vibratePattern();
+                        }
+                    }, 2000); // Repeat every 2 seconds
+                }
+            }
+            
+            vibratePattern();
+            
+            return {
+                stop: () => {
+                    isVibrating = false;
+                    if (vibrationInterval) {
+                        clearTimeout(vibrationInterval);
+                    }
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate(0); // Stop any ongoing vibration
+                    }
+                }
+            };
+        }
+        
+        function keepPageActive() {
+            // Try to request a wake lock to keep the page active
+            if ('wakeLock' in navigator) {
+                navigator.wakeLock.request('screen').then(wakeLock => {
+                    console.log('Wake lock acquired');
+                }).catch(err => {
+                    console.log('Wake lock failed:', err);
+                });
+            }
+        }
+        
+        function setupBackgroundAlarm(alarmId, title, message) {
+            // Set up interval to continue alarm even if page is backgrounded
+            const backgroundInterval = setInterval(() => {
+                if (activeAlarms.has(alarmId)) {
+                    // Try to show notification again
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(`🚨 ${title}`, {
+                            body: message,
+                            tag: 'dayflow-alarm-persistent',
+                            requireInteraction: true,
+                            vibrate: [500, 200, 500]
+                        });
+                    }
+                    
+                    // Continue vibration
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate([500, 200, 500]);
+                    }
+                } else {
+                    clearInterval(backgroundInterval);
+                }
+            }, 5000); // Every 5 seconds
+            
+            // Store the interval so we can clear it later
+            const alarm = activeAlarms.get(alarmId);
+            if (alarm) {
+                alarm.backgroundInterval = backgroundInterval;
             }
         }
         
@@ -799,12 +932,75 @@
                             })
                         );
                     });
+                    
+                    // Handle background sync for alarms
+                    self.addEventListener('sync', event => {
+                        if (event.tag === 'dayflow-alarm-check') {
+                            event.waitUntil(checkAlarmsInBackground());
+                        }
+                    });
+                    
+                    // Handle notification actions
+                    self.addEventListener('notificationclick', event => {
+                        event.notification.close();
+                        
+                        if (event.action === 'dismiss') {
+                            // Handle dismiss action
+                            clients.matchAll().then(clients => {
+                                clients.forEach(client => {
+                                    client.postMessage({
+                                        action: 'dismissAlarm',
+                                        alarmId: event.notification.tag
+                                    });
+                                });
+                            });
+                        } else {
+                            // Default action - open the app
+                            event.waitUntil(
+                                clients.matchAll().then(clients => {
+                                    if (clients.length > 0) {
+                                        clients[0].focus();
+                                    } else {
+                                        clients.openWindow('/');
+                                    }
+                                })
+                            );
+                        }
+                    });
+                    
+                    async function checkAlarmsInBackground() {
+                        const now = new Date();
+                        const today = now.getDay();
+                        const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+                        
+                        // This would need to access stored schedule data
+                        // For now, we'll rely on the main thread checking
+                        return Promise.resolve();
+                    }
                 `;
                 
                 const blob = new Blob([swCode], { type: 'application/javascript' });
                 const swUrl = URL.createObjectURL(blob);
                 
-                navigator.serviceWorker.register(swUrl);
+                navigator.serviceWorker.register(swUrl).then(registration => {
+                    console.log('Service Worker registered');
+                    
+                    // Register for background sync
+                    if ('sync' in window.ServiceWorkerRegistration.prototype) {
+                        registration.sync.register('dayflow-alarm-check').catch(err => {
+                            console.log('Background sync registration failed:', err);
+                        });
+                    }
+                }).catch(err => {
+                    console.log('Service Worker registration failed:', err);
+                });
+                
+                // Listen for messages from service worker
+                navigator.serviceWorker.addEventListener('message', event => {
+                    if (event.data.action === 'dismissAlarm') {
+                        dismissAlarm(event.data.alarmId);
+                    }
+                });
             }
         }
     </script>
